@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">Tradu-Launcher</string>
+    <string name="download">Descargar</string>
+    <string name="play">Jugar</string>
+    <string name="install">Instalar</string>
+    <string name="open">Abrir</string>
+    <string name="install_permission_message">Debes permitir la instalación de apps desconocidas</string>
+    <string name="install_permission_denied">Permiso de instalación no concedido.</string>
+    <string name="cannot_open_app">No se pudo abrir la app.</string>
+    <string name="download_apk_error">Error al descargar el APK.</string>
+    <string name="no_projects_found">No se encontraron proyectos disponibles.</string>
+    <string name="apk_download_complete_title">Descarga completada: %1$s</string>
+    <string name="apk_download_complete_text">Toca para instalar el APK descargado.</string>
+    <string name="apk_download_channel_name">Descargas de APK</string>
+    <string name="apk_download_channel_desc">Notificaciones de descargas de APK completadas</string>
 </resources>

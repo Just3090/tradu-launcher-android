@@ -1,0 +1,14 @@
+{
+  "version_catalogo": "1.0",
+  "proyectos": [
+    {
+      "id_proyecto": "ddbs",
+      "titulo": "Doki Doki Blue Skies",
+      "descripcion": "Descripción del juego",
+      "imagen_portada_url": "https://static-trad-club.nyc3.cdn.digitaloceanspaces.com/img/ddbs/blue-skies-1cpqJZuICZlBklpf37q89hbIAzugGn.jpg",
+      "url_descarga_apk": "https://static-trad-club.nyc3.cdn.digitaloceanspaces.com/big_files/BlueSkies_v1.0.0.apk",
+      "version": "1.0",
+      "packageName": "com.ddbs.blueskies"
+    }
+  ]
+}
