@@ -1,4 +1,3 @@
-
 package com.just6889.td.tradu_launcher.ui
 
 import androidx.compose.runtime.SideEffect
@@ -51,9 +50,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 
 @Composable
-fun ProjectsScreen(viewModel: ProjectsViewModel) {
+fun ProjectsScreen(
+    viewModel: ProjectsViewModel,
+    onProjectClick: (Project) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val projects by viewModel.projects.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     // --- Permiso de notificaciones (Android 13+) ---
-    val context = androidx.compose.ui.platform.LocalContext.current
     val showNotificationDialog = rememberSaveable { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -62,7 +67,6 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
             Toast.makeText(context, "No se podrán mostrar notificaciones de descargas.", Toast.LENGTH_LONG).show()
         }
     }
-
     // --- Diálogo emergente de descarga completada ---
     val showInstallPrompt by viewModel.showInstallPrompt.collectAsState()
     val showDialog = remember { mutableStateOf(false) }
@@ -96,7 +100,6 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
             }
         )
     }
-
     SideEffect {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
@@ -105,7 +108,6 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
             }
         }
     }
-
     if (showNotificationDialog.value) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showNotificationDialog.value = false },
@@ -126,26 +128,11 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
             }
         )
     }
-    val projects by viewModel.projects.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-
-    // Refrescar estado de proyectos al volver a la app (onResume)
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // Refrescar estado de todos los proyectos
-                projects.forEach { project ->
-                    viewModel.refreshProjectState(context, project)
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+    LaunchedEffect(projects) {
+        if (projects.isNotEmpty()) {
+            viewModel.detectInstalledAppsSilently(context, projects)
         }
     }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -173,10 +160,12 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
             }
             else -> {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(8.dp)
+                    modifier = modifier.fillMaxSize().padding(8.dp)
                 ) {
                     items(projects) { project ->
-                        ProjectCard(project, context, viewModel)
+                        ProjectCard(project, context, viewModel) {
+                            onProjectClick(it)
+                        }
                     }
                 }
             }
@@ -185,7 +174,12 @@ fun ProjectsScreen(viewModel: ProjectsViewModel) {
 }
 
 @Composable
-fun ProjectCard(project: Project, context: android.content.Context, viewModel: ProjectsViewModel) {
+fun ProjectCard(
+    project: Project,
+    context: android.content.Context,
+    viewModel: ProjectsViewModel,
+    onShowDetail: (Project) -> Unit
+) {
     Card(
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
@@ -212,7 +206,9 @@ fun ProjectCard(project: Project, context: android.content.Context, viewModel: P
                 Text(project.descripcion, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.width(8.dp))
-            InstallOrOpenButton(project, context, viewModel)
+            Button(onClick = { onShowDetail(project) }) {
+                Text("Ver")
+            }
         }
     }
 }
@@ -256,6 +252,8 @@ fun InstallOrOpenButton(project: Project, context: android.content.Context, view
                 Button(onClick = {
                     try {
                         ApkUtils.installApk(context, project)
+                        // Guardar versión instalada (del JSON) al lanzar la instalación
+                        viewModel.saveInstalledVersion(context, project)
                         // Refrescar estado tras intentar instalar
                         viewModel.refreshProjectState(context, project)
                         errorMessage.value = null
@@ -264,6 +262,21 @@ fun InstallOrOpenButton(project: Project, context: android.content.Context, view
                     }
                 }) {
                     Text(stringResource(id = R.string.install))
+                }
+                errorMessage.value?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            ProjectInstallState.UPDATE_AVAILABLE -> {
+                Button(onClick = {
+                    try {
+                        viewModel.startDownload(context, project)
+                        errorMessage.value = null
+                    } catch (e: Exception) {
+                        errorMessage.value = "Error al actualizar: ${e.localizedMessage}"
+                    }
+                }) {
+                    Text("Actualizar")
                 }
                 errorMessage.value?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

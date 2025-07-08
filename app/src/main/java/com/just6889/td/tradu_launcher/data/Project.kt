@@ -10,7 +10,17 @@ data class Project(
     val imagen_portada_url: String,
     val url_descarga_apk: String,
     val version: String,
-    val packageName: String
+    val packageName: String,
+    val detalles: ProjectDetails? = null
+)
+
+@Serializable
+data class ProjectDetails(
+    val descripcion_full: String? = null,
+    val genero: String? = null,
+    val autor: String? = null,
+    val traducido_por: String? = null,
+    val port_hecho_por: String? = null
 )
 
 @Serializable

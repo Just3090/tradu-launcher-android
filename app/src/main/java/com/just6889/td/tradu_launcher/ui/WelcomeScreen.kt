@@ -85,6 +85,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             ) {
                 Text(if (installUnknownAllowed) "Permiso de instalar APKs concedido" else "Permitir instalación de APKs")
             }
+            Spacer(modifier = Modifier.height(16.dp))
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {

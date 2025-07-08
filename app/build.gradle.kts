@@ -41,6 +41,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.lifecycle:lifecycle-process:2.6.2")
     // DataStore para onboarding
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     // Notificaciones
@@ -56,6 +57,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Retrofit y serialización
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -66,8 +68,10 @@ dependencies {
     // Coil para Compose
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+
     // Activity Result API en Compose
     implementation("androidx.activity:activity-compose:1.9.0")
+
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 

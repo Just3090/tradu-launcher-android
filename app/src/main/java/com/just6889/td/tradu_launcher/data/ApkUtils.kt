@@ -12,6 +12,7 @@ import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.widget.Toast
+import android.os.Build
 
 object ApkUtils {
     /**
@@ -22,7 +23,9 @@ object ApkUtils {
         if (!apkFile.exists()) return null
         val pm = context.packageManager
         val info = pm.getPackageArchiveInfo(apkFile.absolutePath, 0)
-        return info?.packageName
+        val pkg = info?.packageName
+        android.util.Log.d("ApkUtils", "getPackageNameFromApk: ${apkFile.absolutePath} -> $pkg")
+        return pkg
     }
     /**
      * Borra el archivo APK si la app está instalada. Devuelve true si se borró, false si no existía, lanza excepción si falla.
@@ -39,7 +42,12 @@ object ApkUtils {
     }
     fun isApkInstalled(context: Context, packageName: String): Boolean {
         return try {
-            context.packageManager.getPackageInfo(packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(packageName, 0)
+            }
             true
         } catch (e: PackageManager.NameNotFoundException) {
             false

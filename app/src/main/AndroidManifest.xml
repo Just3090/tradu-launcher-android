@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Eliminado MANAGE_EXTERNAL_STORAGE -->
+    <!-- Permite consultar apps instaladas específicas (Android 11+) -->
+    <queries>
+        <package android:name="com.test.ddbs" />
+        <!-- Agrega aquí otros packageName de juegos que quieras detectar -->
+    </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -28,6 +34,14 @@
         <receiver
             android:name=".data.DownloadCompleteReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".data.UninstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"
