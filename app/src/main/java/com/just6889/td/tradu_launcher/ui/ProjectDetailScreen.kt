@@ -1,4 +1,3 @@
-
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.just6889.td.tradu_launcher.ui
 
@@ -32,6 +31,8 @@ import com.just6889.td.tradu_launcher.R
 import com.just6889.td.tradu_launcher.ui.InstallOrOpenButton
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun ProjectDetailScreen(
@@ -48,14 +49,14 @@ fun ProjectDetailScreen(
     android.util.Log.d("ProjectDetailScreen", "Abriendo detalles de: ${project.titulo} | id: ${project.id_proyecto} | estado: $state")
 
     // Manejar prompt de instalación y refresco de estado en detalles
-    val showInstallPrompt by viewModel.showInstallPrompt.collectAsState()
-    LaunchedEffect(showInstallPrompt) {
-        if (showInstallPrompt?.id_proyecto == project.id_proyecto) {
-            viewModel.refreshProjectState(context, project)
-            android.widget.Toast.makeText(context, "El APK de ${project.titulo} se descargó correctamente. ¿Deseas instalarlo ahora?", android.widget.Toast.LENGTH_LONG).show()
-            viewModel.clearInstallPrompt()
-        }
-    }
+    // val showInstallPrompt by viewModel.showInstallPrompt.collectAsState()
+    // LaunchedEffect(showInstallPrompt) {
+    //     if (showInstallPrompt?.id_proyecto == project.id_proyecto) {
+    //         viewModel.refreshProjectState(context, project)
+    //         android.widget.Toast.makeText(context, "El APK de ${project.titulo} se descargó correctamente. ¿Deseas instalarlo ahora?", android.widget.Toast.LENGTH_LONG).show()
+    //         viewModel.clearInstallPrompt()
+    //     }
+    // }
 
     // Refresca el estado del proyecto cada vez que la pantalla vuelve al frente
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -147,6 +148,7 @@ fun ProjectDetailScreen(
                 modifier = Modifier
                     .height(200.dp)
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(project.titulo, style = MaterialTheme.typography.headlineSmall)

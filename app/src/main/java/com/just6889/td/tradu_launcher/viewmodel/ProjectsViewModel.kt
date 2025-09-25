@@ -6,8 +6,10 @@ import com.just6889.td.tradu_launcher.data.Project
 import com.just6889.td.tradu_launcher.data.ProjectRepository
 import com.just6889.td.tradu_launcher.data.ProjectInstallState
 import com.just6889.td.tradu_launcher.data.ApkUtils
+import com.just6889.td.tradu_launcher.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ProjectsViewModel(private val repository: ProjectRepository) : ViewModel() {
@@ -19,15 +21,24 @@ class ProjectsViewModel(private val repository: ProjectRepository) : ViewModel()
     fun detectInstalledAppsSilently(context: android.content.Context, projects: List<Project>) {
         val prefs = context.getSharedPreferences("launcher_versions", android.content.Context.MODE_PRIVATE)
         val editor = prefs.edit()
-        val pm = context.packageManager
         for (project in projects) {
-            val isInstalled = ApkUtils.isApkInstalled(context, project.packageName)
+            val apkFile = ApkUtils.getApkFile(context, project)
+            var realPackageName = project.packageName
+            if (apkFile.exists()) {
+                ApkUtils.getPackageNameFromApk(context, apkFile)?.let {
+                    realPackageName = it
+                }
+            }
+            val isInstalled = ApkUtils.isApkInstalled(context, realPackageName)
+
             val localVersion = prefs.getString("installed_version_${project.id_proyecto}", null)
+
             if (isInstalled && localVersion == null) {
                 editor.putString("installed_version_${project.id_proyecto}", project.version)
-                android.util.Log.d("ProjectsViewModel", "[detectInstalledAppsSilently] App instalada externamente detectada: ${project.packageName} (id: ${project.id_proyecto}) -> se marca como INSTALLED y version=${project.version}")
+                android.util.Log.d("ProjectsViewModel", "[detectInstalledAppsSilently] App instalada externamente detectada: $realPackageName (id: ${project.id_proyecto}) -> se marca como INSTALLED y version=${project.version}")
             } else if (!isInstalled && localVersion != null) {
                 editor.remove("installed_version_${project.id_proyecto}")
+                android.util.Log.d("ProjectsViewModel", "[detectInstalledAppsSilently] App desinstalada detectada: $realPackageName (id: ${project.id_proyecto}) -> se borra la versión local.")
             }
         }
         editor.apply()
@@ -48,25 +59,26 @@ class ProjectsViewModel(private val repository: ProjectRepository) : ViewModel()
     private val _showInstallPrompt = MutableStateFlow<Project?>(null)
     val showInstallPrompt: StateFlow<Project?> = _showInstallPrompt
 
-fun startDownload(context: android.content.Context, project: Project, force: Boolean = false) {
-    _downloadingProject.value = project
-    _downloadProgress.value = 0
-    if (force) {
-        try { com.just6889.td.tradu_launcher.data.ApkUtils.getApkFile(context, project).delete() } catch (_: Exception) {}
-    }
-    com.just6889.td.tradu_launcher.data.ApkUtils.downloadApk(
-        context,
-        project,
-        onDownloadComplete = {
-            _downloadProgress.value = 100
-            _downloadingProject.value = null
-            _showInstallPrompt.value = project
-        },
-        onProgress = { progress ->
-            _downloadProgress.value = progress
+    fun startDownload(context: android.content.Context, project: Project, force: Boolean = false) {
+        _downloadingProject.value = project
+        _downloadProgress.value = 0
+        if (force) {
+            try { com.just6889.td.tradu_launcher.data.ApkUtils.getApkFile(context, project).delete() } catch (_: Exception) {}
         }
-    )
-}
+        com.just6889.td.tradu_launcher.data.ApkUtils.downloadApk(
+            context,
+            project,
+            onDownloadComplete = {
+                _downloadProgress.value = 100
+                _downloadingProject.value = null
+                _showInstallPrompt.value = project
+                refreshProjectState(context, project)
+            },
+            onProgress = { progress ->
+                _downloadProgress.value = progress
+            }
+        )
+    }
 
     fun saveInstalledVersion(context: android.content.Context, project: Project) {
         val prefs = context.getSharedPreferences("launcher_versions", android.content.Context.MODE_PRIVATE)
@@ -107,41 +119,9 @@ fun startDownload(context: android.content.Context, project: Project, force: Boo
             _projects.value = proyectos
             // Calcular estado de instalación por proyecto
             val context = getApplicationContextSafely()
-            val stateMap = mutableMapOf<String, ProjectInstallState>()
             if (context != null) {
-                for (project in proyectos) {
-                    val apkFile = ApkUtils.getApkFile(context, project)
-                    // Detectar packageName real si el APK existe
-                    var realPackageName = project.packageName
-                    if (apkFile.exists()) {
-                        ApkUtils.getPackageNameFromApk(context, apkFile)?.let {
-                            realPackageName = it
-                        }
-                    }
-                    val isInstalled = ApkUtils.isApkInstalled(context, realPackageName)
-                    var installedVersion: String? = null
-                    if (isInstalled) {
-                        try {
-                            val pm = context.packageManager
-                            val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                pm.getPackageInfo(realPackageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-                            } else {
-                                @Suppress("DEPRECATION")
-                                pm.getPackageInfo(realPackageName, 0)
-                            }
-                            installedVersion = pkgInfo.versionName
-                        } catch (_: Exception) {}
-                    }
-                    val state = when {
-                        isInstalled && installedVersion != null && installedVersion != project.version -> ProjectInstallState.UPDATE_AVAILABLE
-                        isInstalled -> ProjectInstallState.INSTALLED
-                        apkFile.exists() -> ProjectInstallState.DOWNLOADED
-                        else -> ProjectInstallState.NOT_DOWNLOADED
-                    }
-                    stateMap[project.id_proyecto] = state
-                }
+                detectInstalledAppsSilently(context, proyectos)
             }
-            _projectInstallStates.value = stateMap
             _isLoading.value = false
             android.util.Log.d("ProjectsViewModel", "Proyectos cargados: ${'$'}{_projects.value.size}")
         }
@@ -160,35 +140,63 @@ fun startDownload(context: android.content.Context, project: Project, force: Boo
 
     // Permite forzar actualización del estado de un proyecto (tras instalar, etc)
     fun refreshProjectState(context: android.content.Context, project: Project) {
-        val apkFile = ApkUtils.getApkFile(context, project)
-        var realPackageName = project.packageName
-        if (apkFile.exists()) {
-            ApkUtils.getPackageNameFromApk(context, apkFile)?.let {
-                realPackageName = it
+        viewModelScope.launch {
+            val apkFile = ApkUtils.getApkFile(context, project)
+            var realPackageName = project.packageName
+            if (apkFile.exists()) {
+                ApkUtils.getPackageNameFromApk(context, apkFile)?.let {
+                    realPackageName = it
+                }
             }
-        }
-        android.util.Log.d("ProjectsViewModel", "[refreshProjectState] Proyecto: ${project.titulo} | id: ${project.id_proyecto} | packageName usado: $realPackageName")
-        val isInstalled = ApkUtils.isApkInstalled(context, realPackageName)
-        android.util.Log.d("ProjectsViewModel", "[refreshProjectState] isInstalled($realPackageName): $isInstalled")
+            android.util.Log.d("ProjectsViewModel", "[refreshProjectState] Proyecto: ${project.titulo} | id: ${project.id_proyecto} | packageName usado: $realPackageName")
+            val isInstalled = ApkUtils.isApkInstalled(context, realPackageName)
+            android.util.Log.d("ProjectsViewModel", "[refreshProjectState] isInstalled($realPackageName): $isInstalled")
 
-        // NUEVO: versión instalada según el launcher (no la del APK)
-        val installedVersion = getInstalledVersion(context, project)
-        android.util.Log.d("ProjectsViewModel", "[refreshProjectState] installedVersion (launcher): $installedVersion | version (json): ${project.version}")
+            val previousState = _projectInstallStates.value[project.id_proyecto]
+            var installedVersion = getInstalledVersion(context, project)
 
-        val state = when {
-            isInstalled && installedVersion != null && installedVersion != project.version -> ProjectInstallState.UPDATE_AVAILABLE
-            isInstalled && installedVersion == project.version -> ProjectInstallState.INSTALLED
-            apkFile.exists() -> ProjectInstallState.DOWNLOADED
-            else -> ProjectInstallState.NOT_DOWNLOADED
-        }
-        val newMap = _projectInstallStates.value.toMutableMap()
-        newMap[project.id_proyecto] = state
-        _projectInstallStates.value = newMap
+            if (isInstalled) {
+                if (_showInstallPrompt.value?.id_proyecto == project.id_proyecto) {
+                    clearInstallPrompt()
+                }
+            }
 
-        if (apkFile.exists() && !isInstalled) {
-            val prevState = _projectInstallStates.value[project.id_proyecto]
-            if (prevState != ProjectInstallState.DOWNLOADED) {
-                android.widget.Toast.makeText(context, "No se detectó la instalación del paquete: $realPackageName", android.widget.Toast.LENGTH_LONG).show()
+            if (isInstalled && installedVersion == null) {
+                saveInstalledVersion(context, project)
+                installedVersion = project.version
+                android.util.Log.d("ProjectsViewModel", "[refreshProjectState] Sincronizando versión para app instalada: ${project.id_proyecto} -> ${project.version}")
+            } else if (!isInstalled && installedVersion != null) {
+                val prefs = context.getSharedPreferences("launcher_versions", android.content.Context.MODE_PRIVATE)
+                prefs.edit().remove("installed_version_${project.id_proyecto}").apply()
+                installedVersion = null
+                android.util.Log.d("ProjectsViewModel", "[refreshProjectState] Limpiando versión para app desinstalada: ${project.id_proyecto}")
+            }
+
+            android.util.Log.d("ProjectsViewModel", "[refreshProjectState] installedVersion (launcher): $installedVersion | version (json): ${project.version}")
+
+            val state = when {
+                isInstalled && installedVersion != null && project.version != installedVersion -> ProjectInstallState.UPDATE_AVAILABLE
+                isInstalled -> ProjectInstallState.INSTALLED
+                apkFile.exists() -> ProjectInstallState.DOWNLOADED
+                else -> ProjectInstallState.NOT_DOWNLOADED
+            }
+            val newMap = _projectInstallStates.value.toMutableMap()
+            newMap[project.id_proyecto] = state
+            _projectInstallStates.value = newMap
+
+            if (state == ProjectInstallState.INSTALLED && (previousState == ProjectInstallState.DOWNLOADED || previousState == ProjectInstallState.UPDATE_AVAILABLE)) {
+                val settingsRepository = SettingsRepository(context)
+                val shouldDelete = settingsRepository.deleteApkAfterInstall.first()
+                if (shouldDelete) {
+                    try {
+                        if (apkFile.exists()) {
+                            apkFile.delete()
+                            android.util.Log.d("ProjectsViewModel", "APK borrado automáticamente tras instalación: ${apkFile.name}")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProjectsViewModel", "Error al borrar APK automáticamente", e)
+                    }
+                }
             }
         }
     }

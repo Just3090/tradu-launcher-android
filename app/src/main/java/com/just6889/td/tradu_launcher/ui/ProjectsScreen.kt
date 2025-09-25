@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.rememberAsyncImagePainter
 import androidx.compose.ui.res.painterResource
@@ -83,9 +84,12 @@ fun ProjectsScreen(
             text = { Text("El APK de ${showInstallPrompt!!.titulo} se descargó correctamente. ¿Deseas instalarlo ahora?") },
             confirmButton = {
                 TextButton(onClick = {
-                    ApkUtils.installApk(context, showInstallPrompt!!)
+                    val projectToInstall = showInstallPrompt!!
+                    ApkUtils.installApk(context, projectToInstall)
+                    viewModel.saveInstalledVersion(context, projectToInstall)
                     showDialog.value = false
                     viewModel.clearInstallPrompt()
+                    viewModel.refreshProjectState(context, projectToInstall)
                 }) {
                     Text("Instalar")
                 }
@@ -198,7 +202,9 @@ fun ProjectCard(
                     error = painterResource(id = R.drawable.error_image)
                 ),
                 contentDescription = project.titulo,
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -298,14 +304,23 @@ fun InstallOrOpenButton(project: Project, context: android.content.Context, view
                             errorMessage.value = "Error al borrar APK: ${e.localizedMessage}"
                             false
                         }
-                        val launchIntent = context.packageManager.getLaunchIntentForPackage(realPackageName)
-                        if (launchIntent != null) {
+                        var launchIntent = context.packageManager.getLaunchIntentForPackage(realPackageName)
+                        if (launchIntent == null) {
+                            launchIntent = Intent(Intent.ACTION_MAIN).also {
+                                it.addCategory(Intent.CATEGORY_LAUNCHER)
+                                it.setPackage(realPackageName)
+                                it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                        }
+
+                        if (launchIntent.resolveActivity(context.packageManager) != null) {
                             context.startActivity(launchIntent)
                             errorMessage.value = null
                             // Refrescar estado tras borrar
                             viewModel.refreshProjectState(context, project)
                         } else {
                             errorMessage.value = context.getString(R.string.cannot_open_app)
+                            viewModel.detectInstalledAppsSilently(context, listOf(project))
                         }
                     } catch (e: Exception) {
                         errorMessage.value = "Error al abrir/jugar: ${e.localizedMessage}"

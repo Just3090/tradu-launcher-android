@@ -14,10 +14,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -37,8 +40,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         notificationGranted = granted
     }
 
-    // Chequeo de permisos actuales
-    LaunchedEffect(Unit) {
+    fun checkPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationGranted = nm.areNotificationsEnabled()
@@ -48,6 +50,23 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         installUnknownAllowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
         } else true
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                checkPermissions()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        checkPermissions()
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
