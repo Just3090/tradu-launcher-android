@@ -5,8 +5,21 @@
     <!-- Eliminado MANAGE_EXTERNAL_STORAGE -->
     <!-- Permite consultar apps instaladas específicas (Android 11+) -->
     <queries>
+        <package android:name="com.just6889port.ddlc" />
+        <package android:name="com.z.mas.portby.just6889" />
         <package android:name="com.test.ddbs" />
-        <!-- Agrega aquí otros packageName de juegos que quieras detectar -->
+        <package android:name="com.dimensions.port" />
+        <package android:name="com.z.dd.exitmusic.portby.just6889" />
+        <package android:name="com.test.dokibanzai" />
+        <package android:name="com.test.ddlcnight" />
+        <package android:name="com.test.ourtime" />
+        <package android:name="com.test.flc" />
+        <package android:name="com.z.ddreflection.portby.just6889.tdclub" />
+        <package android:name="com.just6889port.crimsomdevotion" />
+        <package android:name="com.z.our.bad.ending.portby.just6889" />
+        <package android:name="com.just6889.ddmidnight" />
+        <package android:name="com.just6889.theblueseas" />
+        <package android:name="com.just6889.nightmareyanderedoki" />
     </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
